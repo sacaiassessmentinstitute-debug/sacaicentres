@@ -1,0 +1,133 @@
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        /* This ensures the map fills the entire browser window */
+        body { margin: 0; padding: 0; }
+        #map { height: 100vh; width: 100%; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // ------------------------------------------------------------------------------------
+        // PART 1: EXAM CENTRE DATA (Current Known Locations)
+        // ------------------------------------------------------------------------------------
+        // 'province_code' MUST match the 'id' property in your za.json file (e.g., ZAGP matches ZAGP)
+        const centres_data = [
+            {"name": "Head Office / Pretoria East", "province_code": "ZAGP", "lat": -25.7749, "lon": 28.2699},
+            {"name": "East Rand Centre", "province_code": "ZAGP", "lat": -26.1750, "lon": 28.3200},
+            {"name": "Rondebosch Centre", "province_code": "ZAWC", "lat": -33.9572, "lon": 18.4682},
+            {"name": "George Centre", "province_code": "ZAWC", "lat": -33.9661, "lon": 22.4645},
+            {"name": "Durban Centre", "province_code": "ZAKZN", "lat": -29.8587, "lon": 31.0218},
+            {"name": "Pietermaritzburg Centre", "province_code": "ZAKZN", "lat": -29.6001, "lon": 30.3778},
+            {"name": "Bloemfontein Centre", "province_code": "ZAFS", "lat": -29.1170, "lon": 26.2250},
+            {"name": "Port Elizabeth Centre", "province_code": "ZAEC", "lat": -33.9610, "lon": 25.6176},
+            {"name": "East London Centre", "province_code": "ZAEC", "lat": -33.0069, "lon": 27.8967},
+            {"name": "Polokwane Centre", "province_code": "ZALP", "lat": -23.8967, "lon": 29.4589},
+            {"name": "Witbank Centre", "province_code": "ZAMP", "lat": -25.8754, "lon": 29.3654},
+            {"name": "Rustenburg Centre", "province_code": "ZANW", "lat": -25.6582, "lon": 27.2343},
+            {"name": "Kimberley Centre", "province_code": "ZANC", "lat": -28.7380, "lon": 24.7679},
+            {"name": "Upington Centre", "province_code": "ZANC", "lat": -28.4552, "lon": 21.2375}
+        ];
+        // ------------------------------------------------------------------------------------
+
+
+        // 1. Initialize the map centered on South Africa
+        const map = L.map('map').setView([-29.5, 24.5], 5); // SA Center and initial zoom
+
+        // 2. Add OpenStreetMap tile layer (the base map)
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let centreMarkers = L.layerGroup().addTo(map); // Layer to hold all exam centre pins
+
+        // Function to display the exam centre markers for a selected province
+        function displayCentres(provinceCode) {
+            centreMarkers.clearLayers(); // Clear old markers
+            
+            centres_data.forEach(centre => {
+                if (centre.province_code === provinceCode) {
+                    L.marker([centre.lat, centre.lon])
+                        .addTo(centreMarkers)
+                        .bindPopup(`<b>SACAI Exam Centre:</b><br>${centre.name}`);
+                }
+            });
+        }
+
+        // Style for the provinces (Applies to the za.json borders)
+        function style(feature) {
+            return {
+                fillColor: '#8da0cb', // A soft blue/purple fill
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                fillOpacity: 0.7
+            };
+        }
+
+        // Action when a province is clicked or hovered over
+        function onEachFeature(feature, layer) {
+            
+            // FIXED: Using 'id' for province code and 'name' for province name 
+            // as confirmed by your za.json file snippet.
+            const provinceCode = feature.properties.id; 
+            const provinceName = feature.properties.name; 
+
+            layer.on({
+                click: function (e) {
+                    // 1. Zoom to the province bounds (Full screen zoom)
+                    map.fitBounds(e.target.getBounds());
+                    
+                    // 2. Display markers for the selected province
+                    displayCentres(provinceCode);
+
+                    // 3. Show a temporary notification
+                    L.popup()
+                        .setLatLng(e.latlng)
+                        .setContent(`Viewing **${provinceName}** centres!`)
+                        .openOn(map);
+                },
+                mouseover: function (e) {
+                    e.target.setStyle({ weight: 4, color: '#666', dashArray: '', fillOpacity: 0.9 });
+                    if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                        e.target.bringToFront();
+                    }
+                },
+                mouseout: function (e) {
+                    e.target.setStyle(style(feature));
+                }
+            });
+            // Initial label when the map loads
+            layer.bindPopup(provinceName);
+        }
+        
+        // ------------------------------------------------------------------------------------
+        // PART 2: LOAD THE GEOJSON BORDERS (za.json)
+        // ------------------------------------------------------------------------------------
+        fetch('za.json') 
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Could not load za.json. Status: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // Add the GeoJSON layer to the map using the real data
+                L.geoJson(data, {
+                    style: style,
+                    onEachFeature: onEachFeature
+                }).addTo(map);
+            })
+            .catch(error => {
+                console.error('Error loading GeoJSON file:', error);
+                alert('FATAL ERROR: Could not load the SA province boundaries (za.json). Please ensure the file is correctly placed AND you are viewing this via a web server (not directly via file://).');
+            });
+    </script>
+</body>
+</html>
